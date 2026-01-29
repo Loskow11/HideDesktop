@@ -1,6 +1,8 @@
 import customtkinter as ctk
 import ctypes
+import keyboard
 import os
+import threading
 from PIL import Image
 
 ctk.set_appearance_mode("Dark")
@@ -11,24 +13,70 @@ class HideDesktopApp(ctk.CTk):
         super().__init__()
 
         self.title("HideDesktop - Hide Mode")
-        self.geometry("400x300")
+        self.geometry("400x380")
         self.resizable(False, False)
 
         if os.path.exists("logo.ico"):
             self.iconbitmap("logo.ico")
 
         self.is_hidden = False
-        
-        # UI Layout
+        self.current_hotkey = "ctrl+alt+p" 
+        self.original_wallpaper = "" 
+        self.black_wallpaper_path = self.create_black_image()
+
         self.label_status = ctk.CTkLabel(self, text="STATUS: VISIBLE", font=("Arial Black", 20))
         self.label_status.pack(pady=(20, 10))
 
-        self.btn_toggle = ctk.CTkButton(self, text="HIDE NOW", 
+        self.btn_toggle = ctk.CTkButton(self, text=f"HIDE NOW ({self.current_hotkey})", 
                                         command=self.toggle_mode, 
                                         height=50, fg_color="#3B8ED0", font=("Arial", 14, "bold"))
         self.btn_toggle.pack(pady=10, padx=20, fill="x")
 
         ctk.CTkFrame(self, height=2, fg_color="gray30").pack(fill="x", padx=20, pady=20)
+
+        self.lbl_config = ctk.CTkLabel(self, text="Keyboard Shortcut:")
+        self.lbl_config.pack()
+
+        self.btn_record = ctk.CTkButton(self, text=f"Change ({self.current_hotkey})", 
+                                        command=self.start_recording_thread, 
+                                        fg_color="gray40", hover_color="gray50")
+        self.btn_record.pack(pady=5)
+
+        self.var_change_wallpaper = ctk.BooleanVar(value=True)
+        self.check_wallpaper = ctk.CTkCheckBox(self, text="Enable Black Wallpaper", variable=self.var_change_wallpaper)
+        self.check_wallpaper.pack(pady=15)
+
+        keyboard.add_hotkey(self.current_hotkey, self.toggle_mode)
+
+    def start_recording_thread(self):
+        self.btn_record.configure(text="Press any keys...", fg_color="#E59400")
+        self.btn_toggle.configure(state="disabled") 
+        threading.Thread(target=self.wait_for_keys, daemon=True).start()
+
+    def wait_for_keys(self):
+        keyboard.remove_hotkey(self.current_hotkey)
+        new_key = keyboard.read_hotkey(suppress=False)
+        self.current_hotkey = new_key
+        keyboard.add_hotkey(self.current_hotkey, self.toggle_mode)
+        
+        self.btn_record.configure(text=f"Change ({self.current_hotkey})", fg_color="gray40")
+        self.btn_toggle.configure(text=f"HIDE NOW ({self.current_hotkey})", state="normal")
+
+    def create_black_image(self):
+        filename = "black_generated.png"
+        path = os.path.abspath(filename)
+        if not os.path.exists(path):
+            img = Image.new('RGB', (100, 100), color='black')
+            img.save(path)
+        return path
+
+    def get_wallpaper(self):
+        ubuff = ctypes.create_unicode_buffer(512)
+        ctypes.windll.user32.SystemParametersInfoW(0x0073, 512, ubuff, 0)
+        return ubuff.value
+
+    def set_wallpaper(self, path):
+        ctypes.windll.user32.SystemParametersInfoW(20, 0, path, 3)
 
     def find_desktop_handle(self):
         user32 = ctypes.windll.user32
@@ -53,10 +101,17 @@ class HideDesktopApp(ctk.CTk):
         
         if self.is_hidden:
             ctypes.windll.user32.ShowWindow(hwnd, 5)
+            if self.var_change_wallpaper.get() and self.original_wallpaper:
+                self.set_wallpaper(self.original_wallpaper)
+            
             self.is_hidden = False
             self.label_status.configure(text="STATUS: VISIBLE", text_color="white")
             self.btn_toggle.configure(fg_color="#3B8ED0") 
         else:
+            if self.var_change_wallpaper.get():
+                self.original_wallpaper = self.get_wallpaper()
+                self.set_wallpaper(self.black_wallpaper_path)
+            
             ctypes.windll.user32.ShowWindow(hwnd, 0)
             self.is_hidden = True
             self.label_status.configure(text="STATUS: HIDDEN", text_color="#FF5555")
