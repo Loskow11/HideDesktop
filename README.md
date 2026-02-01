@@ -1,4 +1,4 @@
-# 🛡️ HideDesktop (Panic Button)
+# 🛡️ HideDesktop
 
 **HideDesktop** is a stealth productivity tool designed for Windows. It allows users to instantly hide all desktop icons and switch the wallpaper to a neutral black background with a single global hotkey. Perfect for presentations, privacy, or minimizing distractions.
 
@@ -20,6 +20,8 @@
 * **Keyboard** (Global hook)
 
 ## 📦 Installation & Usage
+
+**No Python required!** You can simply download the standalone executable.
 
 1.  Download the latest `HideDesktop.exe` from the [Releases](https://github.com/Loskow11/HideDesktop/releases) page.
 2.  Run the executable.
