@@ -2,11 +2,17 @@ import customtkinter as ctk
 import ctypes
 import keyboard
 import os
+import sys
 import threading
 from PIL import Image
 
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")
+
+def resource_path(relative_path):
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.abspath("."), relative_path)
 
 class HideDesktopApp(ctk.CTk):
     def __init__(self):
@@ -16,8 +22,9 @@ class HideDesktopApp(ctk.CTk):
         self.geometry("400x380")
         self.resizable(False, False)
 
-        if os.path.exists("logo.ico"):
-            self.iconbitmap("logo.ico")
+        self.icon_path = resource_path("logo.ico")
+        if os.path.exists(self.icon_path):
+            self.iconbitmap(self.icon_path)
 
         self.is_hidden = False
         self.current_hotkey = "ctrl+alt+p" 
@@ -101,15 +108,21 @@ class HideDesktopApp(ctk.CTk):
         
         if self.is_hidden:
             ctypes.windll.user32.ShowWindow(hwnd, 5)
+            
             if self.var_change_wallpaper.get() and self.original_wallpaper:
-                self.set_wallpaper(self.original_wallpaper)
+                if self.original_wallpaper != self.black_wallpaper_path:
+                    self.set_wallpaper(self.original_wallpaper)
             
             self.is_hidden = False
             self.label_status.configure(text="STATUS: VISIBLE", text_color="white")
             self.btn_toggle.configure(fg_color="#3B8ED0") 
         else:
             if self.var_change_wallpaper.get():
-                self.original_wallpaper = self.get_wallpaper()
+                current_bg = self.get_wallpaper()
+                
+                if current_bg and current_bg != self.black_wallpaper_path:
+                    self.original_wallpaper = current_bg
+                
                 self.set_wallpaper(self.black_wallpaper_path)
             
             ctypes.windll.user32.ShowWindow(hwnd, 0)
