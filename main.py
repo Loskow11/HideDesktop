@@ -4,6 +4,7 @@ import keyboard
 import os
 import sys
 import threading
+import winreg
 from PIL import Image
 
 ctk.set_appearance_mode("Dark")
@@ -28,7 +29,7 @@ class HideDesktopApp(ctk.CTk):
 
         self.is_hidden = False
         self.current_hotkey = "ctrl+alt+p" 
-        self.original_wallpaper = "" 
+        self.original_wallpaper = None 
         self.black_wallpaper_path = self.create_black_image()
 
         self.label_status = ctk.CTkLabel(self, text="STATUS: VISIBLE", font=("Arial Black", 20))
@@ -77,10 +78,19 @@ class HideDesktopApp(ctk.CTk):
             img.save(path)
         return path
 
-    def get_wallpaper(self):
+    def get_wallpaper_api(self):
         ubuff = ctypes.create_unicode_buffer(512)
         ctypes.windll.user32.SystemParametersInfoW(0x0073, 512, ubuff, 0)
         return ubuff.value
+
+    def get_wallpaper_registry(self):
+        try:
+            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Control Panel\Desktop", 0, winreg.KEY_READ)
+            value, _ = winreg.QueryValueEx(key, "WallPaper")
+            winreg.CloseKey(key)
+            return value
+        except Exception:
+            return None
 
     def set_wallpaper(self, path):
         ctypes.windll.user32.SystemParametersInfoW(20, 0, path, 3)
@@ -109,7 +119,7 @@ class HideDesktopApp(ctk.CTk):
         if self.is_hidden:
             ctypes.windll.user32.ShowWindow(hwnd, 5)
             
-            if self.var_change_wallpaper.get() and self.original_wallpaper:
+            if self.var_change_wallpaper.get() and self.original_wallpaper and os.path.exists(self.original_wallpaper):
                 if self.original_wallpaper != self.black_wallpaper_path:
                     self.set_wallpaper(self.original_wallpaper)
             
@@ -117,14 +127,23 @@ class HideDesktopApp(ctk.CTk):
             self.label_status.configure(text="STATUS: VISIBLE", text_color="white")
             self.btn_toggle.configure(fg_color="#3B8ED0") 
         else:
+            found_wallpaper = None
+
             if self.var_change_wallpaper.get():
-                current_bg = self.get_wallpaper()
+                path1 = self.get_wallpaper_api()
+                if path1 and os.path.exists(path1) and path1 != self.black_wallpaper_path:
+                    found_wallpaper = path1
+                else:
+                    path2 = self.get_wallpaper_registry()
+                    if path2 and os.path.exists(path2) and path2 != self.black_wallpaper_path:
+                        found_wallpaper = path2
                 
-                if current_bg and current_bg != self.black_wallpaper_path:
-                    self.original_wallpaper = current_bg
-                
-                self.set_wallpaper(self.black_wallpaper_path)
-            
+                if found_wallpaper:
+                    self.original_wallpaper = found_wallpaper
+                    self.set_wallpaper(self.black_wallpaper_path)
+                else:
+                    self.var_change_wallpaper.set(False)
+
             ctypes.windll.user32.ShowWindow(hwnd, 0)
             self.is_hidden = True
             self.label_status.configure(text="STATUS: HIDDEN", text_color="#FF5555")
